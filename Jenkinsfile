@@ -1,6 +1,9 @@
 pipeline {
     agent any
 
+    // Ajout d'un outil Maven nommé 'M3'. Assurez-vous qu'il existe dans la configuration globale Jenkins
+    tools { maven 'M3' }
+
     environment {
         // placer le repo maven local dans le workspace pour réutilisation entre builds
         MAVEN_OPTS = "-Dmaven.repo.local=${WORKSPACE}/.m2/repository"
@@ -14,13 +17,29 @@ pipeline {
             }
         }
 
+        // Nouveau stage de diagnostic pour vérifier la disponibilité de mvn
+        stage('Diag') {
+            steps {
+                script {
+                    def mvnHome = tool 'M3'
+                    if (isUnix()) {
+                        sh "echo 'Maven home: ${mvnHome}' && echo 'PATH=$PATH' && ${mvnHome}/bin/mvn -v || true"
+                    } else {
+                        bat "echo Maven home: ${mvnHome} && echo %PATH% && \"${mvnHome}\\bin\\mvn\" -v || echo mvn-not-found"
+                    }
+                }
+            }
+        }
+
         stage('Build') {
             steps {
                 script {
+                    // Utiliser explicitement l'outil Maven configuré
+                    def mvnHome = tool 'M3'
                     if (isUnix()) {
-                        sh 'mvn -B -DskipTests clean package'
+                        sh "${mvnHome}/bin/mvn -B -DskipTests clean package"
                     } else {
-                        bat 'mvn -B -DskipTests clean package'
+                        bat "\"${mvnHome}\\bin\\mvn\" -B -DskipTests clean package"
                     }
                 }
             }
@@ -29,10 +48,11 @@ pipeline {
         stage('Test') {
             steps {
                 script {
+                    def mvnHome = tool 'M3'
                     if (isUnix()) {
-                        sh 'mvn -B test'
+                        sh "${mvnHome}/bin/mvn -B test"
                     } else {
-                        bat 'mvn -B test'
+                        bat "\"${mvnHome}\\bin\\mvn\" -B test"
                     }
                 }
             }
